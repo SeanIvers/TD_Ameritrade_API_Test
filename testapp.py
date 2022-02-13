@@ -1,7 +1,6 @@
 import requests
 import pandas as pd
 import plotly.graph_objects as go
-import streamlit as st
 from config import apiKey
 import datetime
 
@@ -104,6 +103,9 @@ class TestApp:
             m = 0
             for iteration in range(num_iterations):
                 b, m = step_gradient(b, m, learning_rate)
+                # Timer countdown
+                if (iteration / 100000).is_integer():
+                    print(int(num_iterations / 100000 - iteration / 100000))
             return [b, m]
 
         b, m = gradient_descent(learning, iterations)
@@ -112,8 +114,9 @@ class TestApp:
 
 test = TestApp()
 
-test.get_historical_price_data('SPY', 'day', 2, 'minute', 5)
+test.get_historical_price_data('SPY', 'day', 10, 'minute', 5)
 # print(test.df)
-test.linear_regression(0.00001, 1000000)
+test.linear_regression(0.000001, 3000000)
 test.show_candlestick_chart()
+# Indicate if y-values are too large
 print(test.y)
