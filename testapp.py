@@ -3,12 +3,13 @@ import pandas as pd
 import plotly.graph_objects as go
 from config import apiKey
 import datetime
+import numpy as np
 
 class TestApp:
     def __init__(self):
         self.data = None
         self.df = None
-        self.df2 = None
+        # self.df2 = None
         self.y = None
         self.EMA_list = []
 
@@ -47,7 +48,7 @@ class TestApp:
 
         self.df = pd.DataFrame(self.data['candles'], columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
 
-        self.df2 = self.df
+        # self.df2 = self.df
 
         return self.data
 
@@ -124,7 +125,7 @@ class TestApp:
             figures.append(go.Scatter(x=self.df['datetime'], y=self.df[f'{num} EMA']))
 
         fig = go.Figure(figures)
-        
+
         fig.update_xaxes(rangebreaks=[dict(bounds=[16, 9.5], pattern='hour'),
                                         dict(bounds=['sat', 'mon'])])
         fig.show()
@@ -134,9 +135,43 @@ class TestApp:
         for arg in self.EMA_list:
             self.df[f'{arg} EMA'] = self.df['close'].ewm(span=arg, adjust=False).mean()
 
+    def add_VWAP(self):
+        # Add cumulative sum of price * volume for the period
+        price_volume_period = []
+        price_volume_cumsum = []
+        vwap = []
+        sum = 0
+        for i in range(self.df['datetime'].size):
+            price_volume_period.append(((self.df.iloc[i, 2] + self.df.iloc[i, 3] + self.df.iloc[i, 4]) / 3) * self.df.iloc[i, 5])
+            sum += price_volume_period[i]
+            price_volume_cumsum.append(sum)
+        # Add cumulative sum of volume
+        self.df['CumSumPV'] = price_volume_cumsum
+        self.df['CumSumVol'] = self.df['volume'].cumsum()
+
+        for i in range(self.df['datetime'].size):
+            vwap.append(price_volume_cumsum[i] / self.df.iloc[i, 7])
+
+        self.df['VWAP'] = vwap
+
+        print(self.df.head())
+
+    def show_candlestick_chart_vwap(self):
+        self.df.iloc[:, 0] = pd.to_datetime(self.df['datetime'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('US/Eastern')
+
+        fig = go.Figure(
+            [
+                go.Candlestick(x=self.df['datetime'], open=self.df['open'], high=self.df['high'], low=self.df['low'], close=self.df['close']),
+                go.Scatter(x=self.df['datetime'], y = self.df['VWAP'])
+            ]
+        )
+        fig.update_xaxes(rangebreaks=[dict(bounds=[16, 9.5], pattern='hour'),
+                                        dict(bounds=['sat', 'mon'])])
+        fig.show()
+
 test = TestApp()
 
-test.get_historical_price_data('MSFT', 'day', 10, 'minute', 5)
+test.get_historical_price_data('MSFT', 'day', 1, 'minute', 5)
 # print(test.df)
 # test.linear_regression(0.000001, 10000000)
 # test.show_candlestick_chart_linear_regression()
@@ -148,7 +183,5 @@ test.get_historical_price_data('MSFT', 'day', 10, 'minute', 5)
 
 # print(test.y)
 
-test.add_EMA(9, 15, 200)
-
-print(test.df.head())
-test.show_candlestick_chart_EMA()
+test.add_VWAP()
+test.show_candlestick_chart_vwap()
