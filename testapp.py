@@ -10,6 +10,7 @@ class TestApp:
         self.df = None
         self.df2 = None
         self.y = None
+        self.EMA_list = []
 
     def get_historical_price_data(self, symbol, periodType, period, frequencyType, frequency, endDate=None, startDate=None, needExtendedHoursData=False):
         endpoint = f"https://api.tdameritrade.com/v1/marketdata/{symbol}/pricehistory"
@@ -50,7 +51,7 @@ class TestApp:
 
         return self.data
 
-    def show_candlestick_chart(self):
+    def show_candlestick_chart_linear_regression(self):
         self.df.iloc[:, 0] = pd.to_datetime(self.df['datetime'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('US/Eastern')
         fig = go.Figure(
             [
@@ -65,9 +66,9 @@ class TestApp:
     def linear_regression(self, learning, iterations):
         # 1 & 2 Day Five Minute - learning_rate = 0.0001, num_iterations = 500000
         # 3 to 5 Day Five Minute - learning_rate = 0.00001, num_iterations = 1000000
+        # 10 Day Five Minute - learning_rate = 0.000001, num_iterations = 10000000
 
         # list of x values - ms since epoch
-        datetime_list = self.df['datetime'].to_list()
         new_x = [x for x in range(self.df['datetime'].size)]
         # list of y values - closing price
         closing_prices_list = self.df['close'].to_list()
@@ -112,11 +113,42 @@ class TestApp:
 
         self.y = [m * x + b for x in new_x]
 
+    def show_candlestick_chart_EMA(self):
+        self.df.iloc[:, 0] = pd.to_datetime(self.df['datetime'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('US/Eastern')
+
+        figures =   [
+                        go.Candlestick(x=self.df['datetime'], open=self.df['open'], high=self.df['high'], low=self.df['low'], close=self.df['close']),
+                    ]
+        
+        for num in self.EMA_list:
+            figures.append(go.Scatter(x=self.df['datetime'], y=self.df[f'{num} EMA']))
+
+        fig = go.Figure(figures)
+        
+        fig.update_xaxes(rangebreaks=[dict(bounds=[16, 9.5], pattern='hour'),
+                                        dict(bounds=['sat', 'mon'])])
+        fig.show()
+
+    def add_EMA(self, *args):
+        self.EMA_list = list(args)
+        for arg in self.EMA_list:
+            self.df[f'{arg} EMA'] = self.df['close'].ewm(span=arg, adjust=False).mean()
+
 test = TestApp()
 
-test.get_historical_price_data('SPY', 'day', 10, 'minute', 5)
+test.get_historical_price_data('MSFT', 'day', 10, 'minute', 5)
 # print(test.df)
-test.linear_regression(0.000001, 3000000)
-test.show_candlestick_chart()
+# test.linear_regression(0.000001, 10000000)
+# test.show_candlestick_chart_linear_regression()
 # Indicate if y-values are too large
-print(test.y)
+
+# test.df['9 EWM'] = test.df['close'].ewm(span=9, adjust=False).mean()
+
+# test.show_candlestick_chart_test()
+
+# print(test.y)
+
+test.add_EMA(9, 15, 200)
+
+print(test.df.head())
+test.show_candlestick_chart_EMA()
