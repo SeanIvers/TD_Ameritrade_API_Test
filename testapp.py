@@ -16,6 +16,7 @@ class TestApp:
     def get_historical_price_data(self, symbol, periodType, period, frequencyType, frequency, endDate=None, startDate=None, needExtendedHoursData=False):
         endpoint = f"https://api.tdameritrade.com/v1/marketdata/{symbol}/pricehistory"
 
+        # Collection of parameters
         parameters = {
             'apikey': apiKey,
             'periodType': periodType, # day, month, year, ytd
@@ -34,6 +35,7 @@ class TestApp:
             'needExtendedHoursData': needExtendedHoursData
         }
 
+        # Convert to ms since epoch
         epoch = datetime.datetime.utcfromtimestamp(0)
 
         def unix_time_milliseconds(datetime):
@@ -42,24 +44,28 @@ class TestApp:
         # If endDate and startDate are provided period will be removed from parameters as required by api
         if endDate and startDate:
             parameters.pop('period')
+            # Convert from datetime format of yyyymmdd hh:mm:ss to ms since epoch for the api - easier date format to work with
             parameters.update({'endDate': int(unix_time_milliseconds(datetime.datetime.strptime(endDate, '%Y%m%d %H:%M:%S'))), 'startDate': int(unix_time_milliseconds(datetime.datetime.strptime(startDate, '%Y%m%d %H:%M:%S')))})
 
+        # Call to the api
         self.data = requests.get(endpoint, params=parameters).json()
 
+        # Convert data to pandas dataframe
         self.df = pd.DataFrame(self.data['candles'], columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
-
-        # self.df2 = self.df
 
         return self.data
 
     def show_candlestick_chart_linear_regression(self):
+        # Convert to regular datetime and set as index of dataframe and set to US/Eastern - Can set to any timezone in dt.tz_convert()
         self.df.iloc[:, 0] = pd.to_datetime(self.df['datetime'], unit='ms').dt.tz_localize('UTC').dt.tz_convert('US/Eastern')
+        # Create figure
         fig = go.Figure(
             [
                 go.Candlestick(x=self.df['datetime'], open=self.df['open'], high=self.df['high'], low=self.df['low'], close=self.df['close']),
                 go.Scatter(x=self.df['datetime'], y = self.y)
             ]
         )
+        # Set to market hours and weekdays for x-axis
         fig.update_xaxes(rangebreaks=[dict(bounds=[16, 9.5], pattern='hour'),
                                         dict(bounds=['sat', 'mon'])])
         fig.show()
@@ -171,7 +177,7 @@ class TestApp:
 
 test = TestApp()
 
-test.get_historical_price_data('MSFT', 'day', 1, 'minute', 5)
+test.get_historical_price_data('SPY', 'day', 1, 'minute', 5, '20220216 15:55:00', '20220216 9:30:00')
 # print(test.df)
 # test.linear_regression(0.000001, 10000000)
 # test.show_candlestick_chart_linear_regression()
@@ -182,6 +188,7 @@ test.get_historical_price_data('MSFT', 'day', 1, 'minute', 5)
 # test.show_candlestick_chart_test()
 
 # print(test.y)
-
-test.add_VWAP()
-test.show_candlestick_chart_vwap()
+test.add_EMA(9, 15, 200)
+test.show_candlestick_chart_EMA()
+# test.add_VWAP()
+# test.show_candlestick_chart_vwap()
